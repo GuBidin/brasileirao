@@ -1,4 +1,3 @@
-
 #importando arquivos panda
 import pandas as pd
 
