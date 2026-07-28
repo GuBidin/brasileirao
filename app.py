@@ -5,11 +5,11 @@ import streamlit as st  # streamlit é uma biblioteca para criar aplicativos web
 st.set_page_config(
     page_title="Análise do Campeonato Brasileiro",
     page_icon="⚽"
-)  # set_page_config() é um método do streamlit que configura a página, podemos passar parâmetros como page_title e page_icon para definir o título e o ícone da página.
+)
 
-st.title("Análise do Campeonato Brasileiro")  # st.title() é um método do streamlit que coloca um título na página.
-st.write("Este aplicativo permite explorar os dados do Campeonato Brasileiro de Futebol.")  # st.write() é um método do streamlit que escreve texto na página.
-st.write("Os dados foram obtidos do site [Kaggle](https://www.kaggle.com/datasets/adaoduque/campeonato-brasileiro-de-futebol).")  # st.write() é um método do streamlit que escreve texto na página.
+st.title("Análise do Campeonato Brasileiro")
+st.write("Este aplicativo permite explorar os dados do Campeonato Brasileiro de Futebol.")
+st.write("Os dados foram obtidos do site [Kaggle](https://www.kaggle.com/datasets/adaoduque/campeonato-brasileiro-de-futebol).")
 
 # Função para carregar e tratar os dados do CSV
 @st.cache_data
@@ -17,8 +17,8 @@ def carregar_dados():
     # lendo o arquivo csv
     df = pd.read_csv('data/campeonato-brasileiro-full.csv')
 
-    # Convertendo a coluna data de texto para data de verdade
-    df["data"] = pd.to_datetime(df["data"])
+    # Convertendo a coluna data de texto para data de verdade (dayfirst=True porque o formato é dd/mm/aaaa)
+    df["data"] = pd.to_datetime(df["data"], dayfirst=True)
 
     # Criando uma nova coluna ano, extraindo o ano da data
     df["ano"] = df["data"].dt.year
@@ -44,8 +44,85 @@ df = carregar_dados()
 # Exibindo as 20 primeiras linhas
 st.dataframe(df.head(20))
 
-#Criar um seletor de time
+# ============================
+# Seletor de time
+# ============================
 times = sorted(set(df["mandante"]) | set(df["visitante"]))
 sel_time = st.selectbox("Selecione um time:", times)
+
+# ============================
+# Filtros
+# ============================
 jogos_casa = df[df["mandante"] == sel_time]
 jogos_fora = df[df["visitante"] == sel_time]
+
+# ============================
+# Contagem dos resultados
+# ============================
+# Em casa
+vitorias_casa = jogos_casa[jogos_casa["resultado"] == "Vitória mandante"].shape[0]
+empates_casa = jogos_casa[jogos_casa["resultado"] == "Empate"].shape[0]
+derrotas_casa = jogos_casa[jogos_casa["resultado"] == "Vitória visitante"].shape[0]
+# Fora
+vitorias_fora = jogos_fora[jogos_fora["resultado"] == "Vitória visitante"].shape[0]
+empates_fora = jogos_fora[jogos_fora["resultado"] == "Empate"].shape[0]
+derrotas_fora = jogos_fora[jogos_fora["resultado"] == "Vitória mandante"].shape[0]
+
+# ============================
+# Totais
+# ============================
+total_casa = jogos_casa.shape[0]
+total_fora = jogos_fora.shape[0]
+
+# ============================
+# Percentuais
+# ============================
+if total_casa > 0:
+    pct_vitorias_casa = (vitorias_casa / total_casa) * 100
+    pct_empates_casa = (empates_casa / total_casa) * 100
+    pct_derrotas_casa = (derrotas_casa / total_casa) * 100
+else:
+    pct_vitorias_casa = 0
+    pct_empates_casa = 0
+    pct_derrotas_casa = 0
+
+if total_fora > 0:
+    pct_vitorias_fora = (vitorias_fora / total_fora) * 100
+    pct_empates_fora = (empates_fora / total_fora) * 100
+    pct_derrotas_fora = (derrotas_fora / total_fora) * 100
+else:
+    pct_vitorias_fora = 0
+    pct_empates_fora = 0
+    pct_derrotas_fora = 0
+
+# ============================
+# Exibição no Streamlit
+# ============================
+st.subheader("📊 Desempenho da Equipe")
+col1, col2 = st.columns(2)
+with col1:
+    st.markdown("## 🏠 Jogos em Casa")
+    st.write(f"**Total de jogos:** {total_casa}")
+    st.metric("Vitórias", f"{pct_vitorias_casa:.1f}%")
+    st.metric("Empates", f"{pct_empates_casa:.1f}%")
+    st.metric("Derrotas", f"{pct_derrotas_casa:.1f}%")
+with col2:
+    st.markdown("## ✈️ Jogos Fora")
+    st.write(f"**Total de jogos:** {total_fora}")
+    st.metric("Vitórias", f"{pct_vitorias_fora:.1f}%")
+    st.metric("Empates", f"{pct_empates_fora:.1f}%")
+    st.metric("Derrotas", f"{pct_derrotas_fora:.1f}%")
+
+# ============================
+# Resumo opcional
+# ============================
+st.divider()
+st.write("### Resumo Numérico")
+resumo = {
+    "Situação": ["Casa", "Fora"],
+    "Jogos": [total_casa, total_fora],
+    "Vitórias (%)": [round(pct_vitorias_casa, 2), round(pct_vitorias_fora, 2)],
+    "Empates (%)": [round(pct_empates_casa, 2), round(pct_empates_fora, 2)],
+    "Derrotas (%)": [round(pct_derrotas_casa, 2), round(pct_derrotas_fora, 2)],
+}
+st.dataframe(pd.DataFrame(resumo), width="stretch")
