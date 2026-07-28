@@ -41,20 +41,37 @@ def carregar_dados():
 # Carregando os dados
 df = carregar_dados()
 
-# Exibindo as 20 primeiras linhas
-st.dataframe(df.head(20))
+# ============================
+# Filtro por ano
+# ============================
+lista_anos = sorted(df["ano"].dropna().unique().tolist())
+lista_anos = ["Todos os tempos"] + lista_anos
+
+sel_ano = st.selectbox("Selecione o ano:", lista_anos)
+
+if sel_ano == "Todos os tempos":
+    df_filtrado = df.copy()
+else:
+    df_filtrado = df[df["ano"] == sel_ano]
 
 # ============================
 # Seletor de time
 # ============================
-times = sorted(set(df["mandante"]) | set(df["visitante"]))
+# A lista de times agora vem do df_filtrado, pra não mostrar times
+# que não jogaram no ano selecionado
+times = sorted(set(df_filtrado["mandante"]) | set(df_filtrado["visitante"]))
 sel_time = st.selectbox("Selecione um time:", times)
 
 # ============================
-# Filtros
+# Exibindo a tabela filtrada
 # ============================
-jogos_casa = df[df["mandante"] == sel_time]
-jogos_fora = df[df["visitante"] == sel_time]
+st.dataframe(df_filtrado.head(20))
+
+# ============================
+# Filtros de casa/fora
+# ============================
+jogos_casa = df_filtrado[df_filtrado["mandante"] == sel_time]
+jogos_fora = df_filtrado[df_filtrado["visitante"] == sel_time]
 
 # ============================
 # Contagem dos resultados
