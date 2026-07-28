@@ -43,3 +43,9 @@ df = carregar_dados()
 
 # Exibindo as 20 primeiras linhas
 st.dataframe(df.head(20))
+
+#Criar um seletor de time
+times = sorted(set(df["mandante"]) | set(df["visitante"]))
+sel_time = st.selectbox("Selecione um time:", times)
+jogos_casa = df[df["mandante"] == sel_time]
+jogos_fora = df[df["visitante"] == sel_time]
