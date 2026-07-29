@@ -10,8 +10,8 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("⚽ Análise do Campeonato Brasileiro")
-st.write("Este aplicativo permite explorar os dados do Campeonato Brasileiro de Futebol.")
+st.title("⚽ Análise do Campeonato Brasileiro") #Titulo do aplicativo
+st.write("Este aplicativo permite explorar os dados do Campeonato Brasileiro de Futebol.") #write é usado para exibir texto no aplicativo
 st.write(
     "Os dados foram obtidos do Kaggle: "
     "https://www.kaggle.com/datasets/adaoduque/campeonato-brasileiro-de-futebol"
@@ -20,12 +20,12 @@ st.write(
 # ============================
 # Função para carregar os dados
 # ============================
-@st.cache_data
+@st.cache_data #Função para carregar os dados do arquivo CSV e realizar algumas transformações
 def carregar_dados():
     df = pd.read_csv("data/campeonato-brasileiro-full.csv")
 
     # Converter data
-    df["data"] = pd.to_datetime(df["data"], dayfirst=True)
+    df["data"] = pd.to_datetime(df["data"], dayfirst=True) 
 
     # Criar coluna ano
     df["ano"] = df["data"].dt.year
@@ -42,6 +42,57 @@ def carregar_dados():
     df["resultado"] = df.apply(resultado, axis=1)
 
     return df
+
+
+# ============================
+# Função para calcular a classificação de um determinado conjunto de jogos
+# ============================
+def calcular_classificacao(df_ano):
+    times_ano = sorted(set(df_ano["mandante"]) | set(df_ano["visitante"]))
+    tabela = []
+
+    for time in times_ano:
+        casa = df_ano[df_ano["mandante"] == time]
+        fora = df_ano[df_ano["visitante"] == time]
+
+        vit_casa = (casa["resultado"] == "Vitória mandante").sum()
+        emp_casa = (casa["resultado"] == "Empate").sum()
+        der_casa = (casa["resultado"] == "Vitória visitante").sum()
+
+        vit_fora = (fora["resultado"] == "Vitória visitante").sum()
+        emp_fora = (fora["resultado"] == "Empate").sum()
+        der_fora = (fora["resultado"] == "Vitória mandante").sum()
+
+        vitorias = vit_casa + vit_fora
+        empates = emp_casa + emp_fora
+        derrotas = der_casa + der_fora
+        jogos = len(casa) + len(fora)
+
+        gols_pro = casa["mandante_Placar"].sum() + fora["visitante_Placar"].sum()
+        gols_contra = casa["visitante_Placar"].sum() + fora["mandante_Placar"].sum()
+
+        pontos = vitorias * 3 + empates
+
+        tabela.append({
+            "Time": time,
+            "Pontos": pontos,
+            "Jogos": jogos,
+            "Vitórias": vitorias,
+            "Empates": empates,
+            "Derrotas": derrotas,
+            "Gols Pró": gols_pro,
+            "Gols Contra": gols_contra,
+            "Saldo de Gols": gols_pro - gols_contra,
+        })
+
+    classificacao = pd.DataFrame(tabela).sort_values(
+        by=["Pontos", "Saldo de Gols", "Gols Pró"],
+        ascending=False
+    ).reset_index(drop=True)
+
+    classificacao.index = classificacao.index + 1  # posição começando em 1
+
+    return classificacao
 
 
 # ============================
@@ -83,9 +134,57 @@ with col2_filtro:
         times
     )
 
-st.subheader(f"🏆 Todos os jogos do Brasileirão ({sel_ano})")
+# ============================
+# Campeão, Promovidos e Rebaixados do ano
+# ============================
+if sel_ano != "Todos os tempos":
+    st.divider()
+    st.subheader(f"🏆 Campeão, Promovidos e Rebaixados — {sel_ano}")
+
+    classificacao_ano = calcular_classificacao(df_filtrado)
+
+    campeao = classificacao_ano.iloc[0]["Time"]
+
+    # Times rebaixados: últimos 4 colocados (padrão atual do Brasileirão desde 2006)
+    n_rebaixados = 4
+    rebaixados = classificacao_ano.tail(n_rebaixados)["Time"].tolist()
+
+    # Times promovidos: jogaram nesse ano mas não jogaram no ano anterior
+    ano_anterior = sel_ano - 1
+    df_ano_anterior = df[df["ano"] == ano_anterior]
+
+    if not df_ano_anterior.empty:
+        times_ano_atual = set(classificacao_ano["Time"])
+        times_ano_anterior = set(df_ano_anterior["mandante"]) | set(df_ano_anterior["visitante"])
+        promovidos = sorted(times_ano_atual - times_ano_anterior)
+    else:
+        promovidos = []
+
+    col_a, col_b, col_c = st.columns(3)
+
+    with col_a:
+        st.markdown("### 🥇 Campeão")
+        st.success(campeao)
+
+    with col_b:
+        st.markdown("### ⬆️ Promovidos")
+        if promovidos:
+            for time in promovidos:
+                st.write(f"- {time}")
+        else:
+            st.write("Sem dados do ano anterior para comparação.")
+
+    with col_c:
+        st.markdown("### ⬇️ Rebaixados")
+        for time in rebaixados:
+            st.write(f"- {time}")
+
+    with st.expander("Ver classificação completa do ano"):
+        st.dataframe(classificacao_ano, use_container_width=True)
+
+st.subheader(f"🏆 Todos os jogos do Brasileirão ({sel_ano})") #Subtítulo
 st.dataframe(df_filtrado[["data","mandante","mandante_Placar","visitante_Placar","visitante","resultado","arena"]].sort_values("data"), use_container_width=True)
-st.divider()
+st.divider() #dataframe é usado para exibir os dados em formato de tabela no aplicativo, divider é usado para criar uma linha divisória no aplicativo
 
 # ============================
 # Jogos em casa e fora
@@ -139,6 +238,7 @@ st.dataframe(
 # ============================
 
 # Casa
+#Shape [0] retorna o número de linhas do DataFrame, que corresponde à contagem de jogos com o resultado específico.
 vitorias_casa = jogos_casa[
     jogos_casa["resultado"] == "Vitória mandante"
 ].shape[0]
